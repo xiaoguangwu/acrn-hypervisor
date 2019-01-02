@@ -1395,7 +1395,7 @@ pci_xhci_apl_drdregs_write(struct pci_xhci_vdev *xdev, uint64_t offset,
 		excap++;
 
 	if (!excap || !excap->data || excap->start != XHCI_APL_DRDCAP_BASE) {
-		UPRINTF(LWRN, "drd extended capability can't be found\r\n");
+		UPRINTF(LFTL, "drd extended capability can't be found\r\n");
 		return -1;
 	}
 
@@ -1403,12 +1403,12 @@ pci_xhci_apl_drdregs_write(struct pci_xhci_vdev *xdev, uint64_t offset,
 
 	offset -= XHCI_APL_DRDREGS_BASE;
 	if (offset != XHCI_DRD_MUX_CFG0) {
-		UPRINTF(LWRN, "drd configuration register access failed.\r\n");
+		UPRINTF(LFTL, "drd configuration register access failed.\r\n");
 		return -1;
 	}
 
 	if (excap_drd->drdcfg0 == value) {
-		UPRINTF(LDBG, "No mode switch action. Current drd: %s mode\r\n",
+		UPRINTF(LFTL, "No mode switch action. Current drd: %s mode\r\n",
 			excap_drd->drdcfg1 & XHCI_DRD_CFG1_HOST_MODE ?
 			"host" : "device");
 		return 0;
@@ -1431,16 +1431,17 @@ pci_xhci_apl_drdregs_write(struct pci_xhci_vdev *xdev, uint64_t offset,
 
 	fd = open(XHCI_NATIVE_DRD_SWITCH_PATH, O_WRONLY);
 	if (fd < 0) {
-		UPRINTF(LWRN, "drd native interface open failed\r\n");
+		UPRINTF(LFTL, "xgwu drd native interface open failed\r\n");
 		return -1;
 	}
 
 	rc = write(fd, mstr, msz);
 	close(fd);
+	UPRINTF(LFTL, "xgwu drd write native interface: rc %d\r\n", rc);
 	if (rc == msz)
 		excap_drd->drdcfg1 = drdcfg1;
 	else {
-		UPRINTF(LWRN, "drd native interface write "
+		UPRINTF(LFTL, "drd native interface write "
 			"%s mode failed, drdcfg0: 0x%x, "
 			"drdcfg1: 0x%x.\r\n",
 			value & XHCI_DRD_CFG0_IDPIN ? "device" : "host",
@@ -1461,10 +1462,10 @@ pci_xhci_excap_write(struct pci_xhci_vdev *xdev, uint64_t offset,
 	if (xdev->excap_ptr && xdev->excap_write)
 		rc = xdev->excap_write(xdev, offset, value);
 	else
-		UPRINTF(LWRN, "write invalid offset 0x%lx\r\n", offset);
+		UPRINTF(LFTL, "drd write invalid offset 0x%lx\r\n", offset);
 
 	if (rc)
-		UPRINTF(LWRN, "something wrong for xhci excap offset "
+		UPRINTF(LFTL, "drd something wrong for xhci excap offset "
 				"0x%lx write \r\n", offset);
 }
 
@@ -3533,8 +3534,9 @@ pci_xhci_excap_read(struct pci_xhci_vdev *xdev, uint64_t offset)
 		excap++;
 	}
 
+	UPRINTF(LFTL, "drd read offset 0x%lx\r\n", offset);
 	if (!excap || excap->start == EXCAP_GROUP_END) {
-		UPRINTF(LWRN, "extended capability 0x%lx can't be found\r\n",
+		UPRINTF(LFTL, "extended capability 0x%lx can't be found\r\n",
 				offset);
 		return value;
 	}
@@ -3545,6 +3547,7 @@ pci_xhci_excap_read(struct pci_xhci_vdev *xdev, uint64_t offset)
 				sizeof(uint32_t));
 	}
 
+	UPRINTF(LFTL, "drd read offset 0x%lx, value: %u\r\n", offset, value);
 	return value;
 }
 
