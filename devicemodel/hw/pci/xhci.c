@@ -1238,6 +1238,23 @@ pci_xhci_usbcmd_write(struct pci_xhci_vdev *xdev, uint32_t cmd)
 		}
 	}
 
+	if (cmd & XHCI_CMD_CRS) {
+		int fd, rc;
+
+		fd = open(XHCI_NATIVE_DRD_SWITCH_PATH, O_WRONLY);
+		if (fd < 0) {
+			UPRINTF(LFTL, "drd 2 native interface open failed\r\n");
+			return -1;
+		}
+
+		UPRINTF(LFTL, "write device in the CRS trap\r\n");
+		rc = write(fd, "device", 6);
+		if (rc != 6)
+			UPRINTF(LFTL, "drd 2 native interface write failure %d\r\n", rc);
+
+		close(fd);
+	}
+
 	cmd &= ~(XHCI_CMD_CSS | XHCI_CMD_CRS);
 	return cmd;
 }
@@ -1411,7 +1428,6 @@ pci_xhci_apl_drdregs_write(struct pci_xhci_vdev *xdev, uint64_t offset,
 		UPRINTF(LDBG, "No mode switch action. Current drd: %s mode\r\n",
 			excap_drd->drdcfg1 & XHCI_DRD_CFG1_HOST_MODE ?
 			"host" : "device");
-		return 0;
 	}
 
 	excap_drd->drdcfg0 = value;
@@ -4197,6 +4213,9 @@ pci_xhci_deinit(struct vmctx *ctx, struct pci_vdev *dev, char *opts)
 	free(xdev->portregs);
 
 	usb_dev_sys_deinit();
+
+	excap_drd_apl.drdcfg0 = 0;
+	excap_drd_apl.drdcfg1 = 0;
 
 	xdev->vbdp_polling = false;
 	sem_post(&xdev->vbdp_sem);
