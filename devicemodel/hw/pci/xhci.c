@@ -509,9 +509,12 @@ static struct pci_xhci_option_elem xhci_option_table[] = {
 };
 
 
-static void pci_xhci_reset_role(void)
+static void pci_xhci_reset_role(int host, int device, const char *reason)
 {
 	int fd, rc;
+
+	if (!host && !device)
+		return;
 
 	fd = open(XHCI_NATIVE_DRD_SWITCH_PATH, O_WRONLY);
 	if (fd < 0) {
@@ -519,20 +522,26 @@ static void pci_xhci_reset_role(void)
 		return;
 	}
 
-	UPRINTF(LWRN, "write device in the CRS trap\r\n");
-	rc = write(fd, "host", 4);
-	if (rc != 4)
-		UPRINTF(LFTL, "drd 1 native interface write failure %d\r\n", rc);
+	UPRINTF(LWRN, "drd reset role, (%d, %d), reason: %s\r\n", host, device,
+			reason);
 
-	rc = fsync(fd);
-	if (rc)
-		UPRINTF(LFTL, "drd 2 native interface write failure %d\r\n", rc);
+	if (host) {
+		rc = write(fd, "host", 4);
+		if (rc != 4)
+			UPRINTF(LFTL, "drd native interface write h: %d\r\n", rc);
 
-	usleep(100000);
+		rc = fsync(fd);
+		if (rc)
+			UPRINTF(LFTL, "drd native interface sync: %d\r\n", rc);
+		usleep(100000);
+	}
 
-	rc = write(fd, "device", 6);
-	if (rc != 6)
-		UPRINTF(LFTL, "drd 3 native interface write failure %d\r\n", rc);
+
+	if (device) {
+		rc = write(fd, "device", 6);
+		if (rc != 6)
+			UPRINTF(LFTL, "drd native interface write d: %d\r\n", rc);
+	}
 
 	close(fd);
 }
@@ -1284,7 +1293,7 @@ pci_xhci_usbcmd_write(struct pci_xhci_vdev *xdev, uint32_t cmd)
 			 * to some unknown reason, this operation could help
 			 * xDCI works better.
 			 */
-			pci_xhci_reset_role();
+			pci_xhci_reset_role(1, 1, "CRS");
 
 	cmd &= ~(XHCI_CMD_CSS | XHCI_CMD_CRS);
 	return cmd;
@@ -1483,6 +1492,11 @@ pci_xhci_apl_drdregs_write(struct pci_xhci_vdev *xdev, uint64_t offset,
 	}
 
 	rc = write(fd, mstr, msz);
+
+	if (msz == sizeof("device") - 1 &&
+			!strncmp(mstr, "device", sizeof("device") - 1))
+		pci_xhci_reset_role(1, 1, "SWTCH");
+
 	close(fd);
 	UPRINTF(LWRN, "drd write native interface: rc %d\r\n", rc);
 	if (rc == msz)
@@ -4199,6 +4213,7 @@ pci_xhci_init(struct vmctx *ctx, struct pci_vdev *dev, char *opts)
 	pci_emul_alloc_bar(dev, 0, PCIBAR_MEM32, xdev->regsend);
 	UPRINTF(LDBG, "pci_emu_alloc: %d\r\n", xdev->regsend);
 
+	pci_xhci_reset_role(0, 1, "INIT");
 	pci_lintr_request(dev);
 
 	pthread_mutex_init(&xdev->mtx, NULL);
@@ -4234,6 +4249,8 @@ pci_xhci_deinit(struct vmctx *ctx, struct pci_vdev *dev, char *opts)
 	UPRINTF(LINF, "de-initialization\r\n");
 	assert(xdev);
 	assert(xdev->devices);
+
+	pci_xhci_reset_role(1, 0, "DEINIT");
 
 	for (i = 1; i <= XHCI_MAX_DEVS; ++i) {
 		de = xdev->devices[i];
