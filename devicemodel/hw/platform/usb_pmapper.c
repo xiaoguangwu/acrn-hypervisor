@@ -228,8 +228,7 @@ usb_dev_comp_req(struct libusb_transfer *libusb_xfer)
 		xfer->status = USB_ERR_STALLED;
 		goto stall_out;
 	case LIBUSB_TRANSFER_CANCELLED:
-		xfer->status = USB_ERR_IOERROR;
-		goto out;
+		goto cancel_out;
 	case LIBUSB_TRANSFER_TIMED_OUT:
 		xfer->status = USB_ERR_TIMEOUT;
 		goto out;
@@ -322,12 +321,14 @@ out:
 	if (do_intr && g_ctx.intr_cb)
 		g_ctx.intr_cb(xfer->dev, NULL);
 
+cancel_out:
 	/* unlock and release memory */
 	USB_DATA_XFER_UNLOCK(xfer);
 	libusb_free_transfer(libusb_xfer);
 	if (req && req->buffer)
 		free(req->buffer);
 
+	xfer->requests[req->blk_start] = NULL;
 	free(req);
 }
 
@@ -810,6 +811,7 @@ usb_dev_data(void *pdata, struct usb_data_xfer *xfer, int dir, int epctx)
 	req->buf_length = data_size;
 	req->blk_start = blk_start;
 	req->blk_count = blk_count;
+	xfer->requests[blk_start] = req;
 	UPRINTF(LDBG, "%s: transfer_length %d ep%d-transfer (%d-%d %d) request"
 			"-%d (%d-%d %d) direction %s type %s\r\n", __func__,
 			data_size, epctx, xfer->head, (xfer->tail - 1) %
