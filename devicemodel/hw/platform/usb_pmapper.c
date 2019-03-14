@@ -631,9 +631,18 @@ usb_dev_set_config(struct usb_dev *udev, struct usb_data_xfer *xfer, int config)
 {
 	int rc = 0;
 	struct libusb_config_descriptor *cfg;
+	struct usb_devpath *path;
 
 	assert(udev);
 	assert(udev->handle);
+
+	/* do not set config for accessory device */
+	if (udev->info.pid == 0x2d01) {
+		path = &udev->info.path;
+		UPRINTF(LFTL, "skip to configure accessory device %d-%s\r\n",
+				path->bus, usb_dev_path(path));
+		return;
+	}
 
 	/*
 	 * set configuration
@@ -745,12 +754,19 @@ int
 usb_dev_reset(void *pdata)
 {
 	struct usb_dev *udev;
+	struct usb_devpath *path;
 
 	udev = pdata;
 	assert(udev);
+	path = &udev->info.path;
 
-	UPRINTF(LDBG, "reset endpoints\n");
-	libusb_reset_device(udev->handle);
+	/* do not set config for accessory device */
+	if (udev->info.pid != 0x2d01)
+		libusb_reset_device(udev->handle);
+	else
+		UPRINTF(LFTL, "skip resetting accessory device %d-%s\r\n",
+				path->bus, usb_dev_path(path));
+
 	usb_dev_reset_ep(udev);
 	usb_dev_update_ep(udev);
 	return 0;
