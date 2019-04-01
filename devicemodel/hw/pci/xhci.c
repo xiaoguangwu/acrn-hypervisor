@@ -2839,6 +2839,9 @@ pci_xhci_handle_transfer(struct pci_xhci_vdev *xdev,
 	uint32_t	trbflags;
 	int		do_intr, err;
 	int		do_retry;
+	bool		is_isoch = false;
+	bool		is_empty = false;
+	int		td_size = 0;
 
 	ep_ctx->dwEpCtx0 = FIELD_REPLACE(ep_ctx->dwEpCtx0,
 					 XHCI_ST_EPCTX_RUNNING, 0x7, 0);
@@ -2859,12 +2862,15 @@ retry:
 
 		trbflags = trb->dwTrb3;
 
+		td_size = XHCI_TRB_2_TDSZ_GET(trb->dwTrb2);
+
 		if (XHCI_TRB_3_TYPE_GET(trbflags) != XHCI_TRB_TYPE_LINK &&
 		    (trbflags & XHCI_TRB_3_CYCLE_BIT) !=
 		    (ccs & XHCI_TRB_3_CYCLE_BIT)) {
 			UPRINTF(LDBG, "Cycle-bit changed trbflags %x,"
 					" ccs %x\r\n",
 					trbflags & XHCI_TRB_3_CYCLE_BIT, ccs);
+is_empty = true;
 			break;
 		}
 
@@ -2882,6 +2888,7 @@ retry:
 				goto errout;
 			}
 			xfer_block->processed = USB_XFER_BLK_FREE;
+			xfer_block->td_size = 0;
 			break;
 
 		case XHCI_TRB_TYPE_SETUP_STAGE:
@@ -2913,6 +2920,7 @@ retry:
 				goto errout;
 			}
 			xfer_block->processed = USB_XFER_BLK_HANDLED;
+			xfer_block->td_size = 0;
 			break;
 
 		case XHCI_TRB_TYPE_NORMAL:
@@ -2924,6 +2932,9 @@ retry:
 				goto errout;
 			}
 			/* fall through */
+			if (XHCI_TRB_3_TYPE_GET(trbflags) == XHCI_TRB_TYPE_ISOCH) {
+				is_isoch = true; 
+			}
 
 		case XHCI_TRB_TYPE_DATA_STAGE:
 			xfer_block = usb_data_xfer_append(xfer,
@@ -2932,11 +2943,13 @@ retry:
 					XHCI_GADDR(xdev, trb->qwTrb0)),
 					trb->dwTrb2 & 0x1FFFF, (void *)addr,
 					ccs);
+			xfer_block->td_size = td_size;
 			break;
 
 		case XHCI_TRB_TYPE_STATUS_STAGE:
 			xfer_block = usb_data_xfer_append(xfer, NULL, 0,
 							  (void *)addr, ccs);
+			xfer_block->td_size = 0;
 			break;
 
 		case XHCI_TRB_TYPE_NOOP:
@@ -2947,11 +2960,13 @@ retry:
 				goto errout;
 			}
 			xfer_block->processed = USB_XFER_BLK_HANDLED;
+			xfer_block->td_size = 0;
 			break;
 
 		case XHCI_TRB_TYPE_EVENT_DATA:
 			xfer_block = usb_data_xfer_append(xfer, NULL, 0,
 							  (void *)addr, ccs);
+			xfer_block->td_size = 0;
 			if (!xfer_block) {
 				err = XHCI_TRB_ERROR_TRB;
 				goto errout;
@@ -2997,6 +3012,9 @@ retry:
 
 	if (xfer->ndata <= 0)
 		goto errout;
+
+	if (is_isoch == true && is_empty == false)
+		goto retry;
 
 	if (epid == 1) {
 		err = USB_ERR_NOT_STARTED;
