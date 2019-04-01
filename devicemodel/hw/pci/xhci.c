@@ -2710,6 +2710,11 @@ pci_xhci_xfer_complete(struct pci_xhci_vdev *xdev,
 			continue;
 		}
 
+		if (err == XHCI_TRB_ERROR_SUCCESS && xfer->data[i].blen > 0)
+			err = XHCI_TRB_ERROR_SHORT_PKT;	
+		else if (err == XHCI_TRB_ERROR_SHORT_PKT && xfer->data[i].blen == 0)
+			err = XHCI_TRB_ERROR_SUCCESS;
+
 		evtrb.dwTrb2 = XHCI_TRB_2_ERROR_SET(err) |
 			XHCI_TRB_2_REM_SET(xfer->data[i].blen);
 

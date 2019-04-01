@@ -1085,7 +1085,7 @@ usb_dev_data2(void *pdata, struct usb_data_xfer *xfer, int dir, int epctx)
 	size_per_packet = (data_size / count2);
 
 	req = usb_dev_alloc_req(udev, xfer, dir, data_size, type ==
-			USB_ENDPOINT_ISOC ? (data_size / count2) : 0);
+			USB_ENDPOINT_ISOC ? count2 : 0);
 	if (!req) {
 		xfer->status = USB_ERR_IOERROR;
 		goto done;
