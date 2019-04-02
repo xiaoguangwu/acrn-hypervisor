@@ -2703,8 +2703,9 @@ pci_xhci_xfer_complete(struct pci_xhci_vdev *xdev,
 
 		/* Only interrupt if IOC or short packet */
 		if (!(trb->dwTrb3 & XHCI_TRB_3_IOC_BIT) &&
-		    !((err == XHCI_TRB_ERROR_SHORT_PKT) &&
-		      (trb->dwTrb3 & XHCI_TRB_3_ISP_BIT))) {
+		    !((err == XHCI_TRB_ERROR_SHORT_PKT) && (trb->dwTrb3 & XHCI_TRB_3_ISP_BIT)) &&
+		    !(trb->dwTrb3 & XHCI_TRB_3_ISO_SIA_BIT)
+		    ) {
 
 			i = (i + 1) % USB_MAX_XFER_BLOCKS;
 			continue;
@@ -2714,6 +2715,11 @@ pci_xhci_xfer_complete(struct pci_xhci_vdev *xdev,
 			err = XHCI_TRB_ERROR_SHORT_PKT;	
 		else if (err == XHCI_TRB_ERROR_SHORT_PKT && xfer->data[i].blen == 0)
 			err = XHCI_TRB_ERROR_SUCCESS;
+
+#if 0
+		if (XHCI_TRB_2_TDSZ_GET(trb->dwTrb2) > 0)
+			err = XHCI_TRB_ERROR_SHORT_PKT;
+#endif
 
 		evtrb.dwTrb2 = XHCI_TRB_2_ERROR_SET(err) |
 			XHCI_TRB_2_REM_SET(xfer->data[i].blen);

@@ -347,6 +347,7 @@ usb_dev_comp_iso(struct libusb_transfer *libusb_xfer)
 	int done, done2;
 	uint8_t *pktbuf;
 	int j;
+	int pad = 12;
 
 	assert(libusb_xfer);
 
@@ -463,15 +464,20 @@ usb_dev_comp_iso(struct libusb_transfer *libusb_xfer)
 		buf_idx = 0;
 		if (j > 0) {
 			while (j > 0) {
-				done2 = done;
+				done2 = done; /* ugly code */
 				if (req->in) {
-					if (done > block->blen) 
+					if (done > block->blen)
 						done2 = block->blen;
+					else
+						done2 = done;
+
+					if (done2 == block->blen)
+						done2 -= pad;
 
 					memcpy(block->buf, pktbuf + buf_idx, done2);
-					buf_idx += done2;
 				}
 				done -= done2;
+				buf_idx += done2;
 				block->blen -= done2;
 				block->bdone = done2;
 				block->processed = USB_XFER_BLK_HANDLED;
