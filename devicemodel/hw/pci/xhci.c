@@ -3570,7 +3570,7 @@ pci_xhci_rtsregs_read(struct pci_xhci_vdev *xdev, uint64_t offset)
 		clock_gettime(CLOCK_MONOTONIC, &t);
 		time_diff = (t.tv_sec - xdev->mf_prev_time.tv_sec) * 1000000
 			+ (t.tv_nsec - xdev->mf_prev_time.tv_nsec) / 1000;
-		xdev->mf_prev_time = t;
+//		xdev->mf_prev_time = t;
 		value = time_diff / 125;
 
 		if (value >= 1)
