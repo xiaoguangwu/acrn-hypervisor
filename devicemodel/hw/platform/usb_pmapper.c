@@ -346,8 +346,12 @@ usb_dev_comp_iso(struct libusb_transfer *libusb_xfer)
 	int tds = 0;
 	int done, done2;
 	uint8_t *pktbuf;
+	uint8_t *p1, *p2;
 	int j;
 	int pad = 12;
+	//int topad = 0;
+	int td_idx = -1;
+	int len1, len2;
 
 	assert(libusb_xfer);
 
@@ -414,24 +418,121 @@ usb_dev_comp_iso(struct libusb_transfer *libusb_xfer)
 		break;
 	}
 
-	for (i = 0; i < libusb_xfer->num_iso_packets; i++) {
-		struct libusb_iso_packet_descriptor *p =
-				&libusb_xfer->iso_packet_desc[i];
-
-		len += p->actual_length;
-		UPRINTF(LDBG, "packet%u length %u actual_length %u\n",
-				i, p->length, p->actual_length);
-	}
-
 	for (i = 0, idx = req->blk_start; i < req->blk_count; ++i) {
 		block = &xfer->data[idx % USB_MAX_XFER_BLOCKS];
 		tds += (block->td_size > 0 ? (block->td_size - 1) : 0);
+
+		if (block->td_size > 0 && libusb_xfer->iso_packet_desc[i].actual_length > 100) {
+			assert(td_idx == -1);
+			//topad = 2 * pad;
+			td_idx = i;
+		}
+
 		count2++;
 		idx = (idx + 1) % USB_MAX_XFER_BLOCKS;
 	}
 	count2 -= tds;
 
+	len1 = 0;
+	for (i = 0; i < libusb_xfer->num_iso_packets; i++) {
+		struct libusb_iso_packet_descriptor *p =
+				&libusb_xfer->iso_packet_desc[i];
 
+		len1 += p->actual_length;
+	}
+
+#if 0
+	len1 = 0;
+	for (i = 0; i < libusb_xfer->num_iso_packets; i++) {
+		struct libusb_iso_packet_descriptor *p =
+				&libusb_xfer->iso_packet_desc[i];
+
+		len1 += p->actual_length;
+		if (td_idx >= 0 && topad > 0) {
+
+			assert((i+1) < libusb_xfer->num_iso_packets);
+			p1 = libusb_get_iso_packet_buffer(libusb_xfer, i);
+			p2 = libusb_get_iso_packet_buffer(libusb_xfer, i+1);
+
+			if ((p->length - p->actual_length) > topad) {
+				memcpy(p1 + p->actual_length, p2 + 12, topad);
+				memmove(p2 + 12, p2 + 12 + topad, libusb_xfer->iso_packet_desc[i+1].actual_length - topad);
+				p->actual_length += topad;
+				topad = 0;
+			} else if ((p->length - p->actual_length) > pad) {
+				memcpy(p1 + p->actual_length, p2 + 12, pad);
+				memmove(p2 + 12, p2 + 12 + pad, libusb_xfer->iso_packet_desc[i+1].actual_length - pad);
+				p->actual_length += pad;
+				topad -= pad;
+			}
+
+			if (i == td_idx) {
+				assert(p->actual_length > 24);
+				p->actual_length -= (pad * 2);
+			}
+		}
+
+		UPRINTF(LDBG, "packet%u length %u actual_length %u\n",
+				i, p->length, p->actual_length);
+	}
+#endif
+
+	if (td_idx >= 0 && libusb_xfer->iso_packet_desc[td_idx].actual_length < 100)
+		td_idx = -1;
+
+	if (td_idx >= 0) {
+		int room = 24;
+		int p1_act_size, p1_exp_size;
+		int p2_act_size/*, p2_exp_size*/;
+		int tgt = -1;
+
+
+		for (i = td_idx; i + 1 < libusb_xfer->num_iso_packets; i++) {
+			p1_exp_size = libusb_xfer->iso_packet_desc[i+1].length;
+			p1_act_size = libusb_xfer->iso_packet_desc[i+1].actual_length;
+
+			if (p1_exp_size - p1_act_size > room)
+				tgt = i;
+		}
+		assert(tgt > 0);
+
+		for (i = tgt; i > td_idx; --i) {
+			p1 = libusb_get_iso_packet_buffer(libusb_xfer, i);
+			p2 = libusb_get_iso_packet_buffer(libusb_xfer, i-1);
+
+			//p1_exp_size = libusb_xfer->iso_packet_desc[i].length;
+			p1_act_size = libusb_xfer->iso_packet_desc[i].actual_length;
+
+			//p2_exp_size = libusb_xfer->iso_packet_desc[i-1].length;
+			p2_act_size = libusb_xfer->iso_packet_desc[i-1].actual_length;
+
+			if (p1_act_size > 12)
+				memmove(p1 + 12 + room, p1 + 12, p1_act_size-12);
+
+			assert(p2_act_size - 12 > room);
+			memcpy(p1 + 12, p2 + p2_act_size - room, room);
+			libusb_xfer->iso_packet_desc[i].actual_length += room;
+			libusb_xfer->iso_packet_desc[i-1].actual_length -= room;
+		}
+		td_idx = -1;
+	}
+
+	len2 = 0;
+	for (i = 0; i < libusb_xfer->num_iso_packets; i++) {
+		struct libusb_iso_packet_descriptor *p =
+				&libusb_xfer->iso_packet_desc[i];
+		len2 += p->actual_length;
+		UPRINTF(LDBG, "packet%u length %u actual_length %u\n",
+				i, p->length, p->actual_length);
+	}
+
+	if ( len1 != len2) {
+		printf(" ---- len1 %d\r\n", len1);
+		printf(" ---- len2 %d\r\n", len2);
+		*((int *)0) = 3;
+	}
+
+	td_idx = -1;
 //	printf("xgwu %s count2 %d, nip %d, tds %d\r\n", __func__, count2, libusb_xfer->num_iso_packets, tds);
 	assert(count2 == libusb_xfer->num_iso_packets);
 	
