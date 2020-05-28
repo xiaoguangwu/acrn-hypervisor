@@ -1023,7 +1023,7 @@ main(int argc, char *argv[])
 			}
 		}
 
-		pr_notice("acrn_sw_load\n");
+		pr_notice("acrn_sw_load Debug llong\n");
 		error = acrn_sw_load(ctx);
 		if (error) {
 			pr_err("acrn_sw_load failed, error=%d\n", error);

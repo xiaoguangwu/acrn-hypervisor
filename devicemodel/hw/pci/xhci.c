@@ -2295,6 +2295,12 @@ pci_xhci_cmd_reset_ep(struct pci_xhci_vdev *xdev,
 		goto done;
 	}
 
+	if (dev == NULL)
+	{
+		UPRINTF(LFTL, "reset ep: dev is NULL Debug llong\r\n");
+		cmderr = XHCI_TRB_ERROR_NO_SLOTS;
+		goto done;
+	}
 	dev_ctx = dev->dev_ctx;
 	ep_ctx = &dev_ctx->ctx_ep[epid];
 
