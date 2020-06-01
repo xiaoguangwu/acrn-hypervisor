@@ -539,8 +539,8 @@ usb_dev_native_toggle_if(struct usb_dev *udev, int claim)
 	path = &udev->info.path;
 	r = libusb_get_active_config_descriptor(udev->info.priv_data, &config);
 	if (r) {
-		UPRINTF(LWRN, "%d-%s: can't get config\r\n", path->bus,
-				usb_dev_path(path));
+		UPRINTF(LWRN, "%s %d-%s: can't get config, r %d\r\n", __func__,
+				path->bus, usb_dev_path(path), r);
 		return -1;
 	}
 
@@ -585,8 +585,8 @@ usb_dev_native_toggle_if_drivers(struct usb_dev *udev, int attach)
 	path = &udev->info.path;
 	r = libusb_get_active_config_descriptor(udev->info.priv_data, &config);
 	if (r) {
-		UPRINTF(LWRN, "%d-%s: can't get config\r\n", path->bus,
-				usb_dev_path(path));
+		UPRINTF(LWRN, "%s %d-%s: can't get config, r %d\r\n", __func__,
+				path->bus, usb_dev_path(path), r);
 		return -1;
 	}
 
@@ -1043,7 +1043,7 @@ usb_dev_init(void *pdata, char *opt)
 	struct usb_dev *udev = NULL;
 	struct libusb_device_descriptor desc;
 	struct usb_native_devinfo *di;
-	int ver;
+	int ver, r;
 
 	di = pdata;
 
@@ -1089,8 +1089,9 @@ usb_dev_init(void *pdata, char *opt)
 	udev->handle  = NULL;
 
 	/* configure physical device through libusb library */
-	if (libusb_open(udev->info.priv_data, &udev->handle)) {
-		UPRINTF(LWRN, "fail to open device.\r\n");
+	r = libusb_open(udev->info.priv_data, &udev->handle);
+	if (r) {
+		UPRINTF(LWRN, "fail to open device. r = %d\r\n", r);
 		goto errout;
 	}
 
