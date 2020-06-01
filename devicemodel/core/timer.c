@@ -78,7 +78,7 @@ acrn_timer_init(struct acrn_timer *timer, void (*cb)(void *, uint64_t),
 	}
 
 	if (timer->fd <= 0) {
-		pr_err("acrn_timer create failed.\n");
+		pr_err("acrn_timer create failed. fd = %d\n", timer->fd);
 		return -1;
 	}
 
