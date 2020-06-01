@@ -1718,7 +1718,6 @@ pci_xhci_init_ep(struct pci_xhci_dev_emu *dev, int epid, uint32_t slot)
 			&devep->timer_data);
 	if (rc < 0) {
 		UPRINTF(LFTL, "ep%d: failed to create isoc timer, rc %d\r\n", epid, rc);
-		goto errout;
 	}
 
 	return 0;
