@@ -1095,10 +1095,12 @@ usb_dev_init(void *pdata, char *opt)
 		goto errout;
 	}
 
+#if 0
 	if (usb_dev_native_toggle_if_drivers(udev, 0) < 0) {
 		UPRINTF(LWRN, "fail to detach interface driver.\r\n");
 		goto errout;
 	}
+#endif
 	return udev;
 
 errout:

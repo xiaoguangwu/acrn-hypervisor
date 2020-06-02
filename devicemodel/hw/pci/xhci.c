@@ -1992,6 +1992,7 @@ pci_xhci_cmd_reset_device(struct pci_xhci_vdev *xdev, uint32_t slot)
 	pci_xhci_reset_slot(xdev, slot);
 
 done:
+	cmderr = XHCI_TRB_ERROR_SUCCESS;
 	return cmderr;
 }
 
@@ -2064,6 +2065,7 @@ pci_xhci_cmd_address_device(struct pci_xhci_vdev *xdev,
 			goto done;
 		}
 
+		di->slot = slot;
 		xdev->native_ports[index].state = VPORT_EMULATED;
 		xdev->devices[rh_port] = dev;
 		xdev->ndevices++;
@@ -3778,6 +3780,8 @@ pci_xhci_reset_port(struct pci_xhci_vdev *xdev, int portn, int warm)
 	struct usb_native_devinfo *di;
 	int speed, error;
 	int index;
+	int slot;
+	struct pci_xhci_dev_emu *dev;
 
 	UPRINTF(LINF, "reset port %d\r\n", portn);
 
@@ -3795,6 +3799,23 @@ pci_xhci_reset_port(struct pci_xhci_vdev *xdev, int portn, int warm)
 
 	if (warm && di->bcd >= 0x300)
 		port->portsc |= XHCI_PS_WRC;
+
+	slot = di->slot;
+	if (xdev->slot_allocated[slot] && xdev->slots[slot]) {
+		dev = xdev->slots[slot];
+
+		UPRINTF(LFTL, "xgwu reset port %d, dev %p, dev2 %p\r\n", portn, dev, xdev->devices[portn]);
+		if (dev && xdev->devices[portn] == dev) {
+
+			pci_xhci_dev_destroy(dev);
+			xdev->devices[portn] = NULL;
+			xdev->slots[slot] = NULL;
+#if 0
+		//	xdev->slot_allocated[slot] = false;
+#endif
+			xdev->ndevices--;
+		}
+	}
 
 	if ((port->portsc & XHCI_PS_PRC) == 0) {
 		port->portsc |= XHCI_PS_PRC;
