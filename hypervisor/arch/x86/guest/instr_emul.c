@@ -166,7 +166,7 @@ static const struct instr_emul_vie_op one_byte_opcodes[256] = {
 	},
 	[0xAB] = {
 		.op_type = VIE_OP_TYPE_STOS,
-		.op_flags = VIE_OP_F_NO_MODRM
+		.op_flags = VIE_OP_F_NO_MODRM | VIE_OP_F_CHECK_GVA_DI,
 	},
 	[0xC6] = {
 		/* XXX Group 11 extended opcode - not just MOV */
