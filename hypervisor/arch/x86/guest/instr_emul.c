@@ -36,6 +36,7 @@
 #include <mmu.h>
 #include <per_cpu.h>
 #include <logmsg.h>
+#include <rtl.h>
 
 #define CPU_REG_FIRST			CPU_REG_RAX
 #define CPU_REG_LAST			CPU_REG_GDTR
@@ -200,6 +201,9 @@ static const struct instr_emul_vie_op one_byte_opcodes[256] = {
 		.op_flags = VIE_OP_F_BYTE_OP,
 	},
 	[0x85] = {
+		.op_type = VIE_OP_TYPE_TEST,
+	},
+	[0xF7] = {
 		.op_type = VIE_OP_TYPE_TEST,
 	},
 	[0x08] = {
@@ -1243,6 +1247,15 @@ static int32_t emulate_test(struct acrn_vcpu *vcpu, const struct instr_emul_vie 
 		vie_mmio_read(vcpu, &val2);
 
 		/* perform the operation and write the result */
+		result = val1 & val2;
+		break;
+	case 0xF7U:
+		val1 = 0;
+		val2 = 0;
+
+		memcpy_s(&val1, 4, &vie->inst[1+1+1+4], 4);
+		vie_mmio_read(vcpu, &val2);
+
 		result = val1 & val2;
 		break;
 	default:
