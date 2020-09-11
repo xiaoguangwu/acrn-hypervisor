@@ -115,6 +115,10 @@ static const struct instr_emul_vie_op two_byte_opcodes[256] = {
 		.op_type = VIE_OP_TYPE_MOVSX,
 		.op_flags = VIE_OP_F_BYTE_OP,
 	},
+	[0x7F] = {
+		.op_type = VIE_OP_TYPE_MOVSX,
+		.op_flags = VIE_OP_F_BYTE_OP,
+	}
 };
 
 static const struct instr_emul_vie_op one_byte_opcodes[256] = {
@@ -944,6 +948,9 @@ static int32_t emulate_movx(struct acrn_vcpu *vcpu, const struct instr_emul_vie 
 
 		/* write the result */
 		vie_update_register(vcpu, reg, val, size);
+		break;
+	case 0x7FU:
+		pr_err("warning, wa and did nothing for MOVDQA instr\n");
 		break;
 	default:
 		/*
